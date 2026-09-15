@@ -1,8 +1,8 @@
 // Shared logic for handling a contact-form submission and emailing it via Resend.
-// This file is transport-agnostic: it takes a plain payload object and returns
-// { statusCode, body }. Both api/contact.js (Vercel) and the Vite dev-server
-// middleware (vite.config.js) call this same function, so there's exactly one
-// place validation/sending logic lives, in dev and in production alike.
+// This file is transport-agnostic: it takes a plain payload object and an API
+// key and returns { statusCode, body }. The Cloudflare Pages Function
+// (functions/api/contact.js) calls this function, so there's exactly one place
+// validation/sending logic lives.
 import { Resend } from 'resend'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -17,7 +17,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;')
 }
 
-export async function sendContactEmail(payload) {
+export async function sendContactEmail(payload, apiKey = process.env?.RESEND_API_KEY) {
   const { name, email, subject, message, website } = payload || {}
 
   // Honeypot: real visitors never fill this hidden field, bots often do.
@@ -44,12 +44,12 @@ export async function sendContactEmail(payload) {
     }
   }
 
-  if (!process.env.RESEND_API_KEY) {
-    console.error('RESEND_API_KEY is not set. Add it to .env for local dev, or your host\'s environment variables in production.')
+  if (!apiKey) {
+    console.error('RESEND_API_KEY is not set. Add it to your host\'s environment variables in production.')
     return { statusCode: 500, body: { success: false, error: 'Email service is not configured on the server.' } }
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY)
+  const resend = new Resend(apiKey)
   const finalSubject = cleanSubject || `Portfolio inquiry from ${cleanName}`
 
   try {
